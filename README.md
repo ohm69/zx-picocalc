@@ -21,7 +21,7 @@ It features a simple UI for game selection, emulates the Kempston joystick and m
 * **Crazy overclocking** to make it work fast enough on RPi 2040 :D
 
 ## Installation 
-1. **Download:** Go to the Releases page and download the latest `zx-picocalc.uf2` file.
+1. **Download:** Go to the [Releases](https://github.com/ohm69/zx-picocalc/releases) page and download the latest `zx-picocalc.uf2` file.
 2. **Bootloader Mode:** Connect your PicoCalc with a computer with a micro USB port (not USB-C) while holding the `BOOTSEL` button. On a PicoCalc this button is available on the back, through the vents, marked with tiny `reset` text. The device will appear on your computer as a USB drive named `RPI-RP2`.
 3. **Flash:** Drag and drop the downloaded `.uf2` file onto the `RPI-RP2` drive. The device will reboot automatically.
 
