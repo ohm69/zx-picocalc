@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.13)
 # note: this must happen before project()
 include(pico_sdk_import.cmake)
 
-project(my_project)
+project(zx)
 
 # initialize the Raspberry Pi Pico SDK
 pico_sdk_init()
@@ -14,14 +14,15 @@ pico_sdk_init()
 ################################################################################
 add_executable(zx
     zx.c
+    picocalc_sb.c
 )
 
-# Enable USB, disable UART output
-pico_enable_stdio_usb(zx 1)
-pico_enable_stdio_uart(zx 0)
- 
+# Enable UART, disable USB output
+pico_enable_stdio_usb(zx 0)
+pico_enable_stdio_uart(zx 1)
+
 # Add pico_stdlib library which aggregates commonly used features
-target_link_libraries(zx pico_stdlib hardware_spi hardware_pwm pico_multicore)
+target_link_libraries(zx pico_stdlib hardware_spi hardware_pwm hardware_gpio hardware_i2c pico_multicore)
 #target_compile_options(zx PRIVATE -Ofast)
 target_compile_options(zx PRIVATE -save-temps -fverbose-asm)
 

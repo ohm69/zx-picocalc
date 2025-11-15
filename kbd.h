@@ -38,7 +38,7 @@
     of the 'sticky count' and auto-release sticky key presses which
     have expired.
 
-    There's two ways to chech the state of the keyboard matrix:
+    There's two ways to check the state of the keyboard matrix:
 
     (1) Call the functions kbd_test_lines() or kbd_test_columns(), these
     take a bit mask of active columns or lines as input, and return a bit mask

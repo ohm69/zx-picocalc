@@ -1,194 +1,78 @@
-The **ZX2040** is a port of [Andre Weissflog](https://github.com/floooh/chips/) ZX Spectrum emulator to the Raspberry Pico RP2040, packed with a simple UI for game selection and key mapping to make it usable without a keyboard.
+# zx-picocalc: A ZX Spectrum Emulator for the PicoCalc
+**Note:** This is a fork of the original **[zx2040 by Salvatore Sanfilippo](https://github.com/antirez/zx2040)**, which itself is a port of [Andre Weissflog's](https://github.com/floooh/chips/) emulator.
+This version has been specifically adapted to run on the PicoCalc hardware. All credit for the powerful core emulator goes to the original authors.
 
-This project is specifically designed for the Raspberry Pico and ST77xx based displays. Our reference device is the [Pimoroni Tufty RP2040 display board](https://shop.pimoroni.com/products/tufty-2040?variant=40036912595027), but actually the code can run into any Raspberry Pico equipped with an ST77x display and five buttons connected to five different pins. The buttons work as inputs for the four gaming directions (left, right, top, bottom) and the fire button. Please refer to the *hardware* section for more information.
+**Video demo** [here](https://www.youtube.com/shorts/tdEk7oRfxbU).
 
-**Video demo** [here](https://www.youtube.com/watch?v=Xxz8N-SCUJU).
+* ![zx-picocalc running Manic Miner on a Picocalc](images/zx_picocalc.jpg)
 
-![Jetpac running on the Pico ZX Spectrum emulator](images/pico_spectrum_emu.jpg)
+**`zx-picocalc`** is a port of the zx2040 ZX Spectrum 48k emulator, modified to run correctly on the [PicoCalc](https://www.clockworkpi.com/picocalc) handheld.
+
+It features a simple UI for game selection, emulates the Kempston joystick and makes use of a full PicoCalc keyboard, allowing not only for playing classic ZX Spectrum games but also programming in 48 BASIC.
 
 ## Main features
 
-* **Pico -> Spectrum key mapping** with each pin mapped up to two Spectrum keys or Kempstone joystick moves. Each game has its own key map, taking advantage of mapping to make games easier to play on portable devices: for instance Jetpac maps a single key (down key) to up + fire. Key macros are used in order to automatically trigger key presses when given frames are reached, to select the kempstone joystick, skip key redefinition, and other things otherwise impossible with few buttons available on the device. No need to recompile to add keymaps.
-* A **minimal ST77xx display driver is included**, written specifically for this project. It has just what it is needed to initialize the display and refresh the screen with the Spectrum frame buffer content. It works both with SPI and 8-wires parallel interfaces and is optimized for fast bulk refreshes.
 * The emulator has an **UI that allows to select games** into a list, change certain emulation settings and so forth.
-* **Easy games upload**, with a script to create a binary image of Z80 games and transfer it into the Pico flash. Games don't need to match the keymap by name: grepping inside memory for known strings is used instead, so you can create your own Z80 snapshots files, and still defined keymaps will work.
+* **Easy games upload**, with a script to create a binary image of Z80 games and transfer it into the Pico flash.
+* **Full Spectrum keyboard support**, with all Caps Shift, Symbol Shift and Extended Mode combinations working. PicoCalc-specific keys, e.g. F1-F10, Tab, Back had been mapped to ZX keys for more comfortable operation.
+* **Kempston Joystick** emulated in two ways: with **arrow keys + `F5`** for fire and with an output for an **actual joystick**, connected to the input on left side of PicoCalc.
 * **Real time upscaling and downscaling** of video, to use the emulator with displays that are larger or smaller than the Spectrum video output. The emulator is also able to remove borders.
-* **Partial update of the display** by tracking memory accesses to the video memory, so that it is possible to transfer a subset of the scanlines to the physical display. This feature can be turned on and off interactively.
-* **Crazy overclocking** to make it work fast enough :D **Warning**: the code must run from the Pico RAM, and not in the memory mapped flash, otherwise it's not possible to go at 400Mhz. This is achieved simply with `pico_set_binary_type(zx copy_to_ram)` in `CMakeList.txt`. There are no problems accessing the flash to load games, because the code down-clocks the CPU when loading games, and then returns at a higher overclocking speeds immediately after.
+* **Tufty -> Spectrum key mapping** had been disabled. PicoCalc does offer a full keyboard so it was not a priority while made debugging much easier.
+* **Crazy overclocking** to make it work fast enough on RPi 2040 :D
 
-## Changes made to the original emulator
+## Installation 
+1. **Download:** Go to the Releases page and download the latest `zx-picocalc.uf2` file.
+2. **Bootloader Mode:** Connect your PicoCalc with a computer with a micro USB port (not USB-C) while holding the `BOOTSEL` button. On a PicoCalc this button is available on the back, through the vents, marked with tiny `reset` text. The device will appear on your computer as a USB drive named `RPI-RP2`.
+3. **Flash:** Drag and drop the downloaded `.uf2` file onto the `RPI-RP2` drive. The device will reboot automatically.
 
-The fantastic emulator I used as a base for this project was not designed for very small devices. It was rather optimized for the elegance of the implementation (you have self-contained emulated chips that are put together with the set of returned pins states) and very accurate emulation. To make it run on the Pico, I had to modify the emulator in the following ways:
+## Adding Games / ZX software
+1. Connect your PicoCalc, again in bootloader mode (micro USB while holding the `BOOTSEL` button).
+2. Enter the `games` directory in this repository.
+3. Copy your .Z80 game files into the games/Z80 subdirectory.
+4. Run the `./loadgames.py` script. This will bundle the games and keymaps and upload them to the Picocalc's flash. This script requires Python installed on your machine.
+5. Disconnect USB cable
 
-* In order to work with the small amount of RAM available in the RP2040, only the Spectrum 48k version is emulated, the 128k code and allocations were removed. The video decoding was also removed. Now the decoding is performed on the fly in the screen update function of the emulator, by reading directly from the Spectrum video memory (this also provided a strong speedup).
-* The emulator UI itself is rendered directly inside the Spectrum video memory in order to save memory.
-* Emulation performances were improved by rewriting video decoding and modifying the Z80 implementation to cheat a bit (well, a lot): many steps of instruction fetching were combined together, slow instructions executed in less cycles, memory accesses done directly inside the Z80 emulation tick, and so forth. This makes the resulting emulator no longer cycle accurate, but otherwise we could go at best at 60% of the speed of real hardware, which is not enough for a nice gaming experience.
-* Audio support was completely rewritten using the Pico second core and double buffering. We have two issues with the RP2040. One is memory. Fortunately there is no need to go from 1 bit music to 16bit samples that will then drive a speaker exactly with 1 bit of actual resolution. It makes sense in the original emulator, since the audio device of a real computer will accept proper 16 bit audio samples, but in the Pico we just drive a pin with a connected speaker. So this repository implements a bitmap audio buffer, reducing the memory usage by a factor of 32. Another major problem is that we are emulating the Spectrum native speed by running without pauses: there is no way to be sure about the exact timing of a full tick (different sequences of instructions run at different speed), and the audio must be played as it is produced (in the original emulator it was assumed that the CPU of the host computer was able to emulate the Spectrum much faster, take the audio buffer, and put the samples in the audio output queue). So I used double buffering, and as the Z80 produces the music we play the other half of the buffer in the other thread, with adaptive timing. The result is recognizable audio even if the quality is not superb.
+## Controls
 
-With this changes, when the Pico is overclocked at 400Mhz (default of this code, **with cpu voltage set to 1.3V**), the emulation speed matches a real ZX Spectrum 48K. If you want to go slower (simpler to play games, and certain Picos may not run well at 400Mhz) press the right button when powering up: this will select 300Mhz.
+### Emulator UI
 
-Please note that a few of this changes are somewhat breaking the emulation accuracy of the original emulator, but they are a needed compromise with performances on the RP2040 and good frame rate. A 20 FPS emulator that runs very smoothly is a nice thing, but breaking the Z80 precise clock may mess a bit with certain games and demos. Moreover, the way we plot the video memory instantaneously N times per second is different than what the ULA does: a game may try to "follow" the CRT beam (for example removing the old sprites once it is sure the beam is over a given part). Most games are resilient to these inconsistencies with the original hardware, but when it's an issue, we resort to game specific tuning of the emulator timing parameters (see the keymap file inside the `games` directory).
+The UI of `zx picocalc` is a simple menu, displayed in the top right corner. It allows for loading software and changing some runtime emulator parameters.
+* `Esc`: Enter / Exit the menu. 
+	* Note: exiting the menu that way will leave an artifact (black rectangle) on the screen. This has to be that way in order to preserve limited RAM of RPi2040.
+* `Up`/`Down`: Select a game or a parameter
+* `Left`/`Right`: Change parameter value
+* `Enter` or `F5`/`Fire`: Load the game and exit the menu. Pressed on a current game reloads it.
 
-## Motivations for this project
+### Emulated ZX controls
 
-The ZX Spectrum was the computer where I learned to code when I was a child. Before owning the Spectrum, I used to play with my father's computer, a TI 99/4A, yet the Spectrum was my first real computer, and the one where I wrote my first decent programs. So part of this is nostalgia.
-
-On a more practical way, I wanted an emulator that was a good fit for the Pico and specifically conceived to run with cheap displays, able to easily be adapted to different displays resolutions, MIT licensed, very easy to hack on. So that people can build, enjoy and even sell if they want battery-powered small cheap Spectrum. This can help to make the ZX Spectrum heritage last more in the future.
-
-Finally, I needed to explore a bit more the Pico SDK and its C development experience. Recently I'm doing embedded programming, and the RP2040 is one of the most interesting MCUs out there. Writing this code was extremely helpful to better understand the platform.
+* `Up`/`Down`/`Left`/`Right`/`F5` on a PicoCalc keyboard: Kempston joystick emulation. Remember to first select Kempston Joystick option in a game.
+* `F1`: `Edit` (Shift-1 on ZX Spectrum)
+* `F2, Tab`: `Extend Mode` (Shift-Symbol Shift on ZX Spectrum)
+* `F3`: `Cursor Left` (Shift-5 on ZX Spectrum)
+* `F4`: `Cursor Right` (Shift-8 on ZX Spectrum)
+* `F6`: `Graphics` (Shift-9 on ZX Spectrum)
+* `F7`: `Caps Lock` (Shift-2 on ZX Spectrum). This is separate from CapsLK on PicoCalc keyboard!
+* `F8`: `True Video` (Shift-3 on ZX Spectrum)
+* `F9`: `Inv Video` (Shift-4 on ZX Spectrum)
+* `Del, Back`: `Delete` (Shift-0 on ZX Spectrum)
+* `Shift-Up`/`Shift-Down`: `Cursor Up/Down` (Shift-6/7 on ZX Spectrum)
+* `0-9 and QWERTY keys`: regular ZX Spectrum keys with keywords, letters, symbols available as on ZX Spectrum
+* `Shift`(the green one): `Picocalc Shift`- lowecase letters and symbols marked green on the PicoCalc
+* `Ctrl`: `ZX Shift`- lowercase letters and symbols marked **white** over numeric keys **on a ZX Spectrum keyboard**
+* `Alt`: `Symbol Shift`- symbols and keywords marked **red** on a ZX Spectrum keyboard
 
 ## Credits
-
-I want to thank [Andre Weissflog](https://github.com/floooh) for writing the original code and let us dream again. If this project was possible it is 90% because of his work.
-
-## Hardware needed
-
-You need either:
-
-* A Pimoroni Tufty 2040.
-* Or, any other suitable Pico + display + 5 buttons combination.
-
-and...
-
-* A piezo speaker if you want audio support.
-
-This project only supports ST77xx displays so far. They are cheap and widespread, and they work well and exist in different qualities: TFT, IPS, and so forth.
-
-A note of warning: it is crucial to be able to refresh the display
-fast enough. SPI displays work well if they are not huge, let's say that up to
-320x240 max the update latency will not be so terrible. However support for partial display update makes the performance of large displays much better in practice, see the next section.
-
-Parallel 8-lines ST77xx displays are much better, for instance in the Tufty 2040, using upscaling, it is possible to transfer the Spectrum CRT frame buffer to the display in something like ~14 milliseconds, so even refreshing the display ~20 times per second we have 700 milliseconds of CPU time to run the emulator itself.
-
-320x240 displays are particularly good because the Spectrum full visible area including borders is 320x256 pixels, so when borders are enabled this is a nice view. When borders are disabled, it's even better: the bitmap resolution of the Spectrum is 256x192 pixels, it means that using 125% upscaling we match exactly the 320x240 display resolution!
-
-The display should also be big enough if you want a nice play experience. Spectrum games were designed to be displayed in a big TV set, so certain details can be too small if very small displays are used. 2.4" is a nice size. Larger is even better.
-
-## Display partial update
-
-If your display is big and/or slow, the display refresh time can slow down
-the emulator significantly. If that's the case, when creating the `device_config.h` file for your board, make sure to enable partial update of display using the following define:
-
-    #define DEFAULT_DISPLAY_PARTIAL_UPDATE 1
-
-You can enable this feature even from the menu, but setting the define will make it on by default.
-
-When this feature is enabled, the emulator tracks video memory accesses in a bitmap of *affected scanlines*. Later, when writing the Spectrum video memory on the display, only the scanlines touched by the ZX Spectrum program running will actually be transferred to the display. This is a very significant speedup.
+I want to thank [Salvatore Sanfilippo](http://invece.org/) for writing [zx2040](https://github.com/antirez/zx2040) in a way that even I 😉 could easily understand. 
+And to [Andre Weissflog](https://floooh.github.io/) for writing the [original code](https://github.com/floooh/chips).
 
 ## Installation from sources
 
 If you build from sources:
-
 * Install `picotool` (`pip install picotool`, or alike) and the Pico SDK.
-* Create a `device_config.h` file in the main directory. For the Pimoroni Tufty 2040 just do `cp devices/tufty2040.h device_config.h`. Otherwise if you have some different board, or you made one by hand with a Pico and an ST77xx display, just check the self-commented example file under the `devices` directory and create a configuration for your setup: it's easy, just define your pins and the display interface (SPI/parallel).
+* Try building one of the example projects included in Pico SDK first. If you cannot build `hello_usb` then you won't be able to build `zx-picocalc`. Ask me how I know.
+* Create a `device_config.h` file in the main directory. For the PicoCalc just do `cp devices/picocalc.h device_config.h`.
 * Compile with: `mkdir build; cd build; cmake ..; make`.
 * Transfer the resulting `zx.uf2` file to your Pico (put it in boot mode pressing the boot button as you power up the device, then drag the file in the `RPI-RP2` drive you see as a USB drive).
-
-## Installation from pre-built images
-
-For the Tufty 2040 there is a ready to flash UF2 file inside the `uf2` directory.
-
-## Adding games
-
-If you run the emulator just after the installation, you will see the Spectrum BASIC screen and a text telling you there are no loaded games in the emulator.
-
-To upload games:
-
-* Enter the `games` directory.
-* Copy your games snapshots (.Z80 files) inside the Z80 directory. There is already a demo made in the 90s there.
-* Check if there is already a keymap defined for your games in the `keymaps.txt` file inside the `games` directory. Games without a keymap defined will likely not work with the default keymap, often to start the game pressing some key is needed, also to select a joystick and so forth. To add a keymap, see the next section. Otherwise, to start more easily, just use the games for which there is already a keymap defined (see list below).
-* Put the Pico in boot mode (power-off, press BOOT button, power-on while the button is pressed), with the Pico connected via USB to your computer.
-* Run the ./loadgames.py script to upload the game image.
-
-The `loadgames.py` will contactenate the Z80 files and the keymap file and will store it into the flash. The bundle can be stored everywhere as long as the address is a multiple of 4096 and does not overwrite the emulator program itself.
-
-Now, if you power-up the emulator, you will see the list of games.
-
-## Creating keymaps
-
-A keymap maps your define buttons (pins, actually) to Spectrum buttons and joystick moves. This is a very simple keymap for Jetpac:
-
-```
-# Jetpack.
-MATCH:JETPAC IS LOADING
-l1|l
-r2|r
-f4|f
-d|f|u   Up + fire combo for simpler playing
-u5|u
-@10:41  Press 4 at frame 10 to select Kempstone
-```
-
-Lines starting with `#` are just comments.
-Then there is a mandatory first line called `MATCH:`. This line will grep the Spectrum memory content (after loading the game) looking for strings matching the game. This way the Jetpac keymap above, will work with Z80 files obtained in different ways, they don't have to be specially named, or to exactly match a given digest or alike. If you want to create a keymap for a game, just open the Z80 file with some editor and look for some unique string to match.
-
-Sometimes it is needed to match multiple strings to be sure that it's a given game. For example the Bombjack keymap uses this match lines:
-
-```
-MATCH:Elite Systems Presents
-AND-MATCH:BEST BOMBERS
-```
-
-You can have all the `AND-MATCH` statements you want.
-
-Then, there are the actual mapping information. They are of three types:
-
-1. Standard mapping, like `l12`, which means map button left pin (as defined in `device_config.h`) to Spectrum keys '1' and '2' (each button on your device can control up to two keys in the Spectrum). You can just write `rx` if you want to associate the left button on your device to a single Spectrum key, `x` in this case.
-2. Extended mapping, like `xur0`, which maps *two* device buttons to a single Spectrum key. This is needed for games where 5 buttons are not enough, so combinations of those buttons are needed.
-3. Macro mappings, pressing keys automatically at a given frame during the game execution. For instance `@20:k2` means: at frame 20 press the key `k` for two frames. Then release it.
-
-There are a few special things to know about mappings.
-
-* Device keys are called `l`, `r`, `u`, `d`, `f`: left, right, up, down, fire.
-* To map to the space key, ~ is used. So `f~` will map the fire button to the Spectrum space.
-* You can map buttons to Kempston joystick movements using the special | character: `l|l` means map the device left button to the joystick left movement.
-* Extended devices are just `x<device-button1><device-button2><spectrum-key>`. See the example above.
-* Macros use "frames" as timer. To create a new map, to make sure when you want to do certain actions, just power-up the device with the left button pressed: a frames counter will show up in the left-top corner, so you can see when it's the right frame to trigger actions.
-
-Certain games have specific requirements about the CRT refresh. This emulator does not emulate the CRT, but writes the video memory directly on the display in one pass (even if it try to syncrhonize with vertical blank interrupt in order to do so). If you see sprites flickering, you may want to use this special directive `SCANLINE-PERIOD` in the keymap. See the example below.
-
-```
-# Thrust. Give it a bit more redrawing time with scanline period of 170.
-MATCH:>>>THRUST<<<
-SCANLINE-PERIOD:170
-la|l
-rs|r
-fim
-dm|d
-up|u
-@20:n1      Do you want to refine keys? [N]o
-```
-
-Other times, like in Skool Daze, the scanline period is reduced in order to trigger the vertical blank interrupt more often and make the game faster.
-
-## Usage
-
-* Select the game and press the fire button to load it. The press the fire button again with the loaded game selected to leave the menu.
-* Long press left+right to return back to the menu.
-* Start with the left button pressed for more serial debugging and frame counter.
-* Start with the right button pressed to boot with a less extreme overclocking (300Mhz instead of 400Mhz). You can adjust it from the menu.
-
-## Games compatibility
-
-This repository includes keymaps that work with the following games:
-
-* [Jetpac](https://en.wikipedia.org/wiki/Jetpac)
-* [Loderunner](https://en.wikipedia.org/wiki/Lode_Runner)
-* [International Karate+](https://en.wikipedia.org/wiki/International_Karate_%2B)
-* [Sabre Wulf](https://en.wikipedia.org/wiki/Sabre_Wulf)
-* [Sanxion](https://en.wikipedia.org/wiki/Sanxion)
-* [Scuba Dive](https://worldofspectrum.org/archive/software/games/scuba-dive-durell-software-ltd)
-* [Thrust](https://en.wikipedia.org/wiki/Thrust_\(video_game\))
-* [BMX Simulator](https://en.wikipedia.org/wiki/BMX_Simulator)
-* [Bombjack](https://en.wikipedia.org/wiki/Bomb_Jack)
-* [Skool Daze](https://en.wikipedia.org/wiki/Skool_Daze)
-* [Pac-Man](https://marco-leal-zx.itch.io/zx-pacman-arcade) incredible conversion by Marco Leal
-
-## Demos compatibility
-
-This is the only demo I tested so far:
-
-* [3D Show](https://worldofspectrum.net/item/0007729/) (19xx), Vektor Graphix.
 
 ## Using this emulator for commercial purposes
 

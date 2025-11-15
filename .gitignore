@@ -5,3 +5,7 @@ games/games.bin
 games/games_list.h
 uf2-append/uf2-append
 uf2-append/uf2-ls
+.DS_Store
+images/.DS_Store
+uf2/.DS_Store
+.obsidian
