@@ -12,7 +12,7 @@ It features a simple UI for game selection, emulates the Kempston joystick and m
 
 ## Main features
 
-* The emulator has an **UI that allows to select games** into a list, change certain emulation settings and so forth.
+* **UI that allows to select games** into a list, change certain emulation settings and so forth.
 * **Easy games upload**, with a script to create a binary image of Z80 games and transfer it into the Pico flash.
 * **Full Spectrum keyboard support**, with all Caps Shift, Symbol Shift and Extended Mode combinations working. PicoCalc-specific keys, e.g. F1-F10, Tab, Back had been mapped to ZX keys for more comfortable operation.
 * **Kempston Joystick** emulated in two ways: with **arrow keys + `F5`** for fire and with an output for an **actual joystick**, connected to the input on left side of PicoCalc.
