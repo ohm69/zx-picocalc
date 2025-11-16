@@ -44,7 +44,7 @@ The UI of `zx picocalc` is a simple menu, displayed in the top right corner. It 
 * `Enter` or `F5`/`Fire`: Load the game and exit the menu. Pressed on a current game reloads it.
 
 ### Emulated ZX controls
-
+#### Keyboard
 * `Up`/`Down`/`Left`/`Right`/`F5` on a PicoCalc keyboard: Kempston joystick emulation. Remember to first select Kempston Joystick option in a game.
 * `F1`: `Edit` (Shift-1 on ZX Spectrum)
 * `F2, Tab`: `Extend Mode` (Shift-Symbol Shift on ZX Spectrum)
@@ -60,6 +60,17 @@ The UI of `zx picocalc` is a simple menu, displayed in the top right corner. It 
 * `Shift`(the green one): `Picocalc Shift`- lowecase letters and symbols marked green on the PicoCalc
 * `Ctrl`: `ZX Shift`- lowercase letters and symbols marked **white** over numeric keys **on a ZX Spectrum keyboard**
 * `Alt`: `Symbol Shift`- symbols and keywords marked **red** on a ZX Spectrum keyboard
+
+#### Joystick
+Regular Atari-style joystick, the one with 9-pin D connector, as used in the 80s can be connected to GPIO ports on the side of PicoCalc.
+![Picocalc external GPIO ports](images/picocalc_gpios.jpg)
+Connections are as follows:
+* `GP2`: Joystick Left -> D9 Pin 3
+* `GP3`: Joystick Right -> D9 Pin 4
+* `GP4`: Joystick Up -> D9 Pin 1
+* `GP5`: Joystick Down -> D9 Pin 2
+* `GP21`: Joystick Fire -> D9 Pin 6
+* `GND`: To be connected with above GPIOs -> D9 Pin 8
 
 ## Credits
 I want to thank [Salvatore Sanfilippo](http://invece.org/) for writing [zx2040](https://github.com/antirez/zx2040) in a way that even I 😉 could easily understand. 
