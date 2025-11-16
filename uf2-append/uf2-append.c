@@ -94,8 +94,10 @@ int main(int argc, char **argv) {
     // written to compute how many padding blocks we require between
     // the orginal UF2 blocks and our data blocks at the target address.
     uint32_t targetAddrMax = 0;
+    fread(&block,sizeof(block),1,in_fp); // ignore first block
     while (fread(&block,sizeof(block),1,in_fp) == 1) {
-        if (targetAddrMax < block.targetAddr)
+        printf("block.targetAddr=0x%08x  targetAddrMax=0x%08x \n", block.targetAddr, targetAddrMax);
+	if (targetAddrMax < block.targetAddr)
             targetAddrMax = block.targetAddr;
     }
     fseek(in_fp,0,SEEK_SET); // Rewind.
