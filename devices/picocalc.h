@@ -21,7 +21,7 @@
 // Please also check the get_device_button() define below as you
 // will also need some tweak there.
 
-#if 0
+#if 1
 #define KEY_LEFT_PULLUP
 #define KEY_RIGHT_PULLUP
 #define KEY_UP_PULLUP
@@ -35,12 +35,11 @@
  * This is also useful if you have buttons that are low when pressed
  * instead of the default (high when pressed). */
 
-#define get_device_button(pin_num) gpio_get(pin_num)
-//#define get_device_button(pin_num) (picocalc_arrow_get(pin_num) | gpio_get(pin_num))
+//#define get_device_button(pin_num) gpio_get(pin_num)
 
 // For example, if you have buttons that drive GPIOs to ground,
 // you may want to invert the return value:
-// #define get_device_button(pin_num) (!gpio_get(pin_num))
+#define get_device_button(pin_num) (!gpio_get(pin_num))
 
 /* ================================ SPEAKER PIN ==============================
  * If you want audio support, can connect a piezo speaker to some pin.
