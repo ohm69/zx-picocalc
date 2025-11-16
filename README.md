@@ -63,7 +63,9 @@ The UI of `zx picocalc` is a simple menu, displayed in the top right corner. It 
 
 #### Joystick
 Regular Atari-style joystick, the one with 9-pin D connector, as used in the 80s can be connected to GPIO ports on the side of PicoCalc.
+
 ![Picocalc external GPIO ports](images/picocalc_gpios.jpg)
+
 Connections are as follows:
 * `GP2`: Joystick Left -> D9 Pin 3
 * `GP3`: Joystick Right -> D9 Pin 4
