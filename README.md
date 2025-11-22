@@ -26,6 +26,16 @@ It features a simple UI for game selection, emulates the Kempston joystick and m
 3. **Flash:** Drag and drop the downloaded `.uf2` file onto the `RPI-RP2` drive. The device will reboot automatically.
 
 ## Adding Games / ZX software
+There are two ways to add the snapshot files with software/games: with an SD card and (legacy) by uploading them to Pico flash.
+
+The SD card way is more convenient and allows for using uf2loader by pelrun!
+Unfortunately, on RP2040 aka Pico 1 only smaller games may be loaded that way at the moment.
+### With an SD card
+1. Save one or several .z80 files into /zxspectrum folder on a SD card compatible with your Picocalc. For your convenience, "0BASIC.z80" file is included. It's an empty snapshot, going right into a 48BASIC on your Picocalc.
+2. Insert the card to the Picocalc
+3. Turn it on
+
+### With Pico flash
 1. Connect your PicoCalc, again in bootloader mode (micro USB while holding the `BOOTSEL` button).
 2. Enter the `games` directory in this repository.
 3. Copy your .Z80 game files into the games/Z80 subdirectory.
