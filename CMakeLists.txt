@@ -12,6 +12,8 @@ pico_sdk_init()
 # rest of your project
 
 ################################################################################
+add_subdirectory(sdmmc)
+add_subdirectory(fatfs)
 add_executable(zx
     zx.c
     picocalc_sb.c
@@ -22,7 +24,7 @@ pico_enable_stdio_usb(zx 0)
 pico_enable_stdio_uart(zx 1)
 
 # Add pico_stdlib library which aggregates commonly used features
-target_link_libraries(zx pico_stdlib hardware_spi hardware_pwm hardware_gpio hardware_i2c pico_multicore)
+target_link_libraries(zx pico_stdlib hardware_spi hardware_pwm hardware_gpio hardware_i2c pico_multicore fatfs)
 #target_compile_options(zx PRIVATE -Ofast)
 target_compile_options(zx PRIVATE -save-temps -fverbose-asm)
 

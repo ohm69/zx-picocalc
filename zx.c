@@ -53,9 +53,12 @@ void load_game(int game_id);
 /* =============================== Games list =============================== */
 
 struct game_entry {
-    char name[8];           // Z80 snapshot filename, first chars.
+    char name[9];           // Zero-terminated 80 snapshot filename, first chars.
     void *addr;             // Address in the flash memory.
     uint32_t size;          // Length in bytes.
+#ifdef PICOCALC
+    char path[64];          // Full path in the flash filesystem. Only for SD-based games.
+#endif
 };
 
 // These are populate during initialization, by scanning the
@@ -151,8 +154,12 @@ struct emustate {
 } EMU;
 
 #ifdef PICOCALC
-#include "picocalc_sb.h" // Southbridge (PicoCalc) I2C access
-#include "picocalc_kbd_zx.h" // PicoCalc keyboard to zx2040 key mapping
+#include "ff.h"             //FAT Filesystem
+#include "picocalc_sb.h"    // Southbridge (PicoCalc) I2C access
+#include "picocalc_kbd_zx.h"// PicoCalc keyboard to zx2040 key mapping
+
+FATFS SDfs = {0}; // SD card filesystem object for snapshots
+static const char* GAME_DIR = "/zxspectrum"; // De-facto standard directory for Spectrum games on SD
 #endif
 
 /* ========================== Emulator user interface ======================= */
@@ -879,6 +886,14 @@ void set_volume(uint32_t volume) {
     pwm_set_enabled(slice_num, volume != 0);
 }
 
+bool has_suffix(const char *filename, const char *suffix)
+{
+  size_t len_filename = strlen(filename);
+  size_t len_suffix = strlen(suffix);
+  if (len_filename < len_suffix) return false;
+  return strcasecmp(filename + len_filename - len_suffix, suffix) == 0;
+}
+
 // Called at startup to seek the games snapshots (Z80 files) and populate
 // the games table. Return true if games were found, otherwise zero
 // is returned, and the caller knows that the user failed to load games.
@@ -893,54 +908,123 @@ int populate_games_list(void) {
    
     // Search for games. We aspect the games snapshots to be stored at
     // the start of any page.
-    printf("Start scanning...\n");
+    printf("Start flash scanning...\n");
     uint8_t *p = NULL;
     for (uint32_t offset = 0; offset < 1024*2048; offset += 4096) {
         p = (uint8_t*)(0x10000000|offset);
         if (!memcmp(marker,p,16)) {
             p += 16; // Skip marker.
-            printf("Games snapshots found at %p\n", p);
+            printf("Bundled snapshots found at %p\n", p);
             break;
         }
         p = NULL; // Signal no found.
     }
-    if (!p) return 0; // No games in the flash, or wrong alignment.
-
-    // Populate our games table. To start, check the size: the Pico supports
-    // realloc() but if we alloc in one pass for the right size, we avoid
-    // memory fragmentation and other issues.
-    printf("Loading...\n");
-    uint8_t *games_table_start = p;
-    GamesTableSize = 0;
-    while (*p != 0) {
-        uint8_t namelen = *p;
-        p += 1+namelen;
-        uint32_t datalen;
-        memcpy(&datalen,p,4);
-        p += 4+datalen;
-        GamesTableSize++;
+    uint32_t BundledSnapshotCnt = 0;
+    uint8_t *games_table_start = NULL;
+    if (p) { // There were bundled snapshots on the flash.
+        // Populate our games table. To start, check the size: the Pico supports
+        // realloc() but if we alloc in one pass for the right size, we avoid
+        // memory fragmentation and other issues.
+        printf("Scanning bundled snapshots...\n");
+        games_table_start = p;
+        while (*p != 0) {
+            uint8_t namelen = *p;
+            p += 1+namelen;
+            uint32_t datalen;
+            memcpy(&datalen,p,4);
+            p += 4+datalen;
+            BundledSnapshotCnt++;
+            printf("Found snapshot #%d\n", BundledSnapshotCnt);
+        }
+        EMU.keymap_file = p+1; // The keymap is at the end of the games snapshots.
+    } else {
+        EMU.keymap_file = NULL; // No keymap.
     }
+    GamesTableSize = BundledSnapshotCnt;
 
-    EMU.keymap_file = p+1; // The keymap is at the end of the games snapshots.
+#ifdef PICOCALC
+    // Count games on SD card
+    DIR dir;
+    FRESULT fr = FR_NOT_READY;
+    if (SDfs.fs_type != 0) {  // successfully mounted
+        static const int MAX_ENTRIES = 100;
+        int entry_count = 0;
+
+        printf("Scanning snapshots on SD card...\n");
+        fr = f_opendir(&dir, GAME_DIR);
+        if (fr != FR_OK) {
+            printf("Failed to open dir '%s': %d\n", GAME_DIR, fr);
+        } else {
+            printf("Dir '%s' opened, scanning for snapshots.\n", GAME_DIR);
+            FILINFO fno;
+            while (f_readdir(&dir, &fno) == FR_OK && entry_count < MAX_ENTRIES && fno.fname[0] != 0) {
+                if (fno.fname[0] == '.') continue;                           // ignore dotfiles
+                if (fno.fattrib & AM_HID || fno.fattrib & AM_SYS) continue;  // ignore hidden files
+                if (fno.fattrib & AM_DIR) continue;                          // ignore directories
+                if (has_suffix(fno.fname, ".z80") == false) continue;        // ignore non z80 files
+
+                entry_count++;
+                printf("Found snapshot #%d: %s, size: %lu bytes\n", entry_count, fno.fname, fno.fsize);
+            }
+            f_closedir(&dir);
+        }
+        GamesTableSize += entry_count;
+    }
+    printf("Total snapshots found: %d\n", GamesTableSize);
+#endif
+    if(GamesTableSize == 0) return 0;
 
     // Now allocate and fill the game table.
-    p = games_table_start;
     struct game_entry *ge;
     GamesTable = malloc(sizeof(*ge) * GamesTableSize);
-    for (int j = 0; j < GamesTableSize; j++) {
+    // Bundled snapshots first
+    p = games_table_start;
+    for (int j = 0; j < BundledSnapshotCnt; j++) {
         ge = &GamesTable[j];
         uint8_t namelen = *p;
         uint8_t copylen = namelen;
-        if (copylen > sizeof(ge->name)) copylen = sizeof(ge->name)-1;
+        if (copylen >= sizeof(ge->name)) copylen = sizeof(ge->name)-1;
         p++; // Seek name.
-        memcpy(ge->name,p,namelen);
-        ge->name[namelen] = 0; // Null term.
+        memcpy(ge->name,p,copylen);
+        ge->name[copylen] = 0; // Null term.
         p += namelen; // Skip name
         memcpy(&ge->size,p,4);
         p += 4;
         ge->addr = p;
         p += ge->size;
+        printf("Registered bundled snapshot #%d: %s, size: %u bytes\n", j+1, ge->name, ge->size);
     }
+
+#ifdef PICOCALC
+    // Then SD snapshots
+    printf("Registering snapshots from SD card...\n");
+    fr = f_opendir(&dir, GAME_DIR);
+    if (fr != FR_OK) {
+        printf("Failed to open dir '%s': %d\n", GAME_DIR, fr);
+    } else {
+        printf("Dir '%s' opened, registering snapshots.\n", GAME_DIR);
+        FILINFO fno;
+        int j = BundledSnapshotCnt;
+        while (f_readdir(&dir, &fno) == FR_OK && j < GamesTableSize && fno.fname[0] != 0) {
+            if (fno.fname[0] == '.') continue;                           // ignore dotfiles
+            if (fno.fattrib & AM_HID || fno.fattrib & AM_SYS) continue;  // ignore hidden files
+            if (fno.fattrib & AM_DIR) continue;                          // ignore directories
+            if (has_suffix(fno.fname, ".z80") == false) continue;        // ignore non z80 files
+
+            ge = &GamesTable[j];
+            strncpy(ge->name, fno.fname, sizeof(ge->name) - 1);
+            ge->name[sizeof(ge->name) - 1] = '\0';
+            ge->size = fno.fsize;
+            ge->addr = NULL; // SD card snapshots are loaded into memory on demand.
+            snprintf(ge->path, sizeof(ge->path), "%s/%s", GAME_DIR, fno.fname);
+            ge->path[sizeof(ge->path) - 1] = '\0';
+            printf("Registered SD snapshot #%d: %s, size: %lu bytes\n", j+1, ge->path, ge->size);
+
+            j++;
+        }
+        f_closedir(&dir);
+    }
+#endif
     return 1;
 }
 
@@ -966,10 +1050,10 @@ void init_emulator(void) {
 
     // Pico Init
     stdio_init_all();
-//    for(int i=3; i>0; i--) { // Countdown to allow serial terminal to connect
-//        printf("ZX Spectrum Emulator starting... %d\n", i);
-//        sleep_ms(1000);
-//    }
+    // for(int i=3; i>0; i--) { // Countdown to allow serial terminal to connect
+    //     printf("ZX Spectrum Emulator starting... %d\n", i);
+    //     sleep_ms(1000);
+    // }
 
     // Display initialization. Show a pattern before overclocking.
     // If users are stuck with four colored squares we know what's up.
@@ -1051,6 +1135,15 @@ void init_emulator(void) {
     // Needed for PicoCalc keyboard
     sb_init(); // Initialize South Bridge.
     picocalc_init_kbd_matrix(&EMU.zx);
+
+    // SD card filesystem init
+    FRESULT fr = FR_NOT_READY;
+    printf("Mounting SD card filesystem...\n");
+    fr = f_mount(&SDfs, "/", 1);
+    if (fr != FR_OK) {
+        printf("Failed to mount SD card filesystem: %d\n", fr);
+        SDfs.fs_type = 0; // Not sure whether it's needed, but won't hurt
+    } 
 #endif
 
     // Enter special mode depending on key presses during power up.
@@ -1176,6 +1269,10 @@ int keymap_descr_to_row(char *p, uint8_t *map) {
 void get_keymap_for_current_game(int game_id) {
     int got_match = 0; // State telling we got a match with RAM content.
     uint8_t *map = EMU.keymap;
+    if(EMU.keymap_file == NULL) {
+        printf("No keymap file loaded\n");
+        return;
+    }
     char *p = EMU.keymap_file;
 
     int line = 1; // Line number inside keymap file.
@@ -1281,7 +1378,42 @@ next_line:
 void load_game(int game_id) {
     set_sys_clock_khz(EMU.base_clock, false); sleep_us(50);
     struct game_entry *g = &GamesTable[game_id];
-    chips_range_t r = {.ptr=g->addr, .size=g->size};
+    chips_range_t r;
+#ifdef PICOCALC
+    uint8_t *sd_buffer = NULL;
+
+    if (g->addr == NULL) { // No address in memory, load from SD card
+        printf("Loading snapshot from SD card: %s, size:%d\n", g->path, g->size);
+        sd_buffer = malloc(g->size);
+        if(sd_buffer == NULL) {
+            printf("Failed to allocate memory for snapshot\n");
+            strncpy(g->name, ":(", strlen(g->name));
+            set_sys_clock_khz(EMU.emu_clock, false); sleep_us(50);
+            return;
+        }
+        FRESULT fr = FR_NOT_READY;
+        FIL fp;
+        UINT br;
+        if((fr = f_open(&fp, g->path, FA_READ)) == FR_OK) {
+            printf("Opened file %s successfully\n", g->path);
+            fr = f_read(&fp, sd_buffer, g->size, &br);
+            printf("Read %u bytes out of %d\n", br, g->size);
+            f_close(&fp);
+        }
+        if(fr != FR_OK) {
+            printf("Failed to read a snapshot file: %d\n", fr);
+            strncpy(g->name, ":(", strlen(g->name));
+            free(sd_buffer);
+            set_sys_clock_khz(EMU.emu_clock, false); sleep_us(50);
+            return;
+        }
+        r = (chips_range_t){.ptr=sd_buffer, .size=g->size};
+    } else {
+        r = (chips_range_t){.ptr=g->addr, .size=g->size};
+    }
+#else
+    r = (chips_range_t){.ptr=g->addr, .size=g->size};
+#endif
     flush_zx_key_press(&EMU.zx); // Make sure no keys are down.
     EMU.tick = 0;
 
@@ -1299,6 +1431,12 @@ void load_game(int game_id) {
 
     // Load game and matching keymap (if any)
     zx_quickload(&EMU.zx, r);
+#ifdef PICOCALC
+    if(sd_buffer != NULL) { // Snapshot RAM buffer no longer needed
+        free(sd_buffer);
+        sd_buffer = NULL;
+    }
+#endif
     get_keymap_for_current_game(game_id);
 
     EMU.loaded_game = game_id;
